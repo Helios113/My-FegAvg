@@ -1,0 +1,7 @@
+/__pychace__
+/raw_data
+/data
+*.pyc
+/raw_data_opp
+/test_results
+/test_params
