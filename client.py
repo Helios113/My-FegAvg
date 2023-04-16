@@ -1,10 +1,10 @@
-# from sklearn.metrics import accuracy_score, recall_score, f1_score, precision_score
 import matplotlib.pyplot as plt
 from models import Composite
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import numpy as np
+from torchmetrics.classification import F1Score
 
 np.random.seed(0)
 torch.manual_seed(0)
@@ -15,14 +15,16 @@ class Client:
         self,
         glob: torch.nn.Module,
         local: torch.nn.Module,
-        dataloader: DataLoader,
+        trainloader: DataLoader,
+        testloader: DataLoader,
         epochs: int,
         learning_rate: float,
         optimizer,
         device,
         momentum=0,
     ):
-        self.dataloader = dataloader
+        self.trainloader = trainloader
+        self.testloader = testloader
         self.device = device
         self.momentum = momentum
         self.optim = optimizer
@@ -34,12 +36,17 @@ class Client:
         self.train_targets = []
         self.train_predictions = []
         self.learning_rate = learning_rate
+        
+        
+        
+        self.metrics = F1Score("multiclass",num_classes=13).to(device)
 
     def load_params(self, w_glob, w_loc):
         if w_glob is not None:
             self.model.get_submodule("glob").load_state_dict(w_glob)
         if w_loc is not None:
             s_dict = {}
+            
             for k in (
                 self.model.get_submodule("local")
                 .get_submodule("layer_list")
@@ -49,7 +56,6 @@ class Client:
             self.model.get_submodule("local").get_submodule(
                 "layer_list"
             ).load_state_dict(s_dict)
-            print("loaded parameters")
 
     def train(self):
         self.model.train()
@@ -63,70 +69,42 @@ class Client:
         else:
             raise ValueError
 
-        num_batch = len(self.dataloader)
+        num_batch = len(self.trainloader)
 
-        performance = np.zeros(self.epochs * num_batch)
+        performance = 0
         for i in range(self.epochs):
             batch_targets = []
             batch_pred = []
-            for batch, data in enumerate(self.dataloader):
+            for batch, data in enumerate(self.trainloader):
                 X, y = data[0], data[1]
                 optimizer.zero_grad()
                 pred = self.model(X)
-                y = y.to("mps")
                 loss = F.cross_entropy(pred, y)
                 loss.backward()
                 optimizer.step()
 
-                batch_targets = y
-                batch_pred = pred.argmax(1)
-
-                performance[i * num_batch + batch] = loss.item()
+                performance += loss.item()
 
         return (
             self.model.get_submodule("glob").state_dict(),
             self.model.get_submodule("local").get_submodule("layer_list").state_dict(),
-            performance,
+            performance/len(self.trainloader),
         )
 
-    def test(self, dataloader):
+    def test(self):
         model = self.model
 
         model.eval()
-        loss_fun = torch.nn.CrossEntropyLoss()
 
-        num_batch = len(dataloader)
-        # num_batches = len(data)
-        # generic train loop
-        # epoch_loss = []
-        # performance = np.zeros((5, num_batch))
+        num_batch = len(self.testloader)
+     
         loss = 0
         with torch.no_grad():
-            batch_targets = []
-            batch_pred = []
-            for batch, data in enumerate(dataloader):
-                X, y = data[0].to(self.device), data[1].to(self.device)
+            for batch, data in enumerate(self.testloader):
+                X, y = data[0], data[1]
                 pred = model(X)
-                if pred.ndim == 1:
-                    pred = pred.reshape(1, -1)
-                loss = loss_fun(pred, y)
-
-                batch_targets = y
-                batch_pred = pred.argmax(1)
-
-                # performance[0, batch] = accuracy_score(
-                #     batch_targets.cpu(), batch_pred.cpu()
-                # )
-                # performance[1, batch] = recall_score(
-                #     batch_targets.cpu(), batch_pred.cpu(), average="micro"
-                # )
-                # performance[2, batch] = precision_score(
-                #     batch_targets.cpu(), batch_pred.cpu(), average="micro"
-                # )
-                # performance[3, batch] = f1_score(
-                #     batch_targets.cpu(), batch_pred.cpu(), average="micro"
-                # )
-                loss += loss.item()
+                loss+=self.metrics(pred,y).item()
+                
 
         return loss / (batch + 1)
 
