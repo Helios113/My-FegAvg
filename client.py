@@ -98,15 +98,15 @@ class Client:
 
         num_batch = len(self.testloader)
      
-        loss = 0
+        loss = np.zeros(num_batch)
         with torch.no_grad():
             for batch, data in enumerate(self.testloader):
                 X, y = data[0], data[1]
                 pred = model(X)
-                loss+=self.metrics(pred,y).item()
-                
-
-        return loss / (batch + 1)
+                print(pred.shape)
+                print(y.shape)
+                loss[batch] = self.metrics(pred,y).item()
+        return loss.mean(), loss.std()
 
     def __repr__(self):
         return self.model.__repr__()
