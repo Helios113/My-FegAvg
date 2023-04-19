@@ -1,38 +1,185 @@
-import numpy as np
+import copy
 import torch
-import random
+from client import Client
+from models import SLC, MLP
+from dataset import FedDataset, get_data
+import numpy as np
+import os
+import argparse
+from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
+from math import ceil
 import pandas as pd
-
-dataset = np.ones((100, 1))
-targets = np.arange(4).repeat(25, 0).reshape(100, 1)
-nDevices = 7
-volPerClient = 1
-classesPerClient = 2
-clients = 4
+from datetime import datetime
+import yaml
 
 
-dataset = np.hstack((dataset, targets))
-data = pd.DataFrame(dataset)
+torch.manual_seed(0)
+np.random.seed(0)
 
-# Best way
-unique_classes = data.iloc[:, -1].unique()
-number_classes = len(unique_classes)
-inds = {}
-for c in unique_classes:
-    inds[c] = list(data.loc[data.iloc[:, -1] == c].index)
-data_size = len(dataset)
-budgetPerClass = np.ceil(data_size / (nDevices * classesPerClient))
-D = {}
-for i in range(nDevices):
-    D[i] = []
-    budgetPerDevice = data_size // (nDevices - i)
-    data_size -= budgetPerDevice
-    k = random.randint(0, number_classes - 1)
-    while budgetPerDevice > 0:
-        t = int(min(budgetPerDevice, budgetPerClass, len(inds[k])))
-        budgetPerDevice -= t
-        B = np.flip(np.sort(random.sample(range(len(inds[k])), t)))
-        for j in B:
-            D[i].append(inds[k].pop(j))
-        k = (k + 1) % number_classes
-    print(D)
+
+parser = argparse.ArgumentParser(description="DM-FedAvg")
+# Optional argument
+parser.add_argument(
+    "--split", type=float, nargs="?", default=0.7, help="Training data portion"
+)
+
+parser.add_argument(
+    "--paramPath",
+    required=True,
+    action="store",
+    type=str,
+    help="yaml file with modality parameters",
+)
+
+args = parser.parse_args()
+
+dirs = os.path.split(args.paramPath)
+save_path = dirs[0]
+# model parameters
+params_loc_path = os.path.join(save_path, "paramsLoc")
+params_glob_path = os.path.join(save_path, "paramsGlob")
+loss_train_path = os.path.join(save_path, "loss_train.txt")
+loss_test_path = os.path.join(save_path, "loss_test.txt")
+f1_test_path = os.path.join(save_path, "f1_test.txt")
+info_path = os.path.join(save_path, "info.txt")
+
+
+# Determine hardware availability
+if torch.cuda.is_available():
+    device = "cuda"  # NVIDIA GPU
+elif torch.backends.mps.is_available():
+    device = "mps"  # Apple GPU
+else:
+    device = "cpu"  # Defaults to CPU if NVIDIA GPU/Apple GPU aren't available
+
+
+# Test parameters
+
+
+all_mod = {
+    "all": [
+        1,
+        2,
+        3,
+        6,
+        7,
+        8,
+        15,
+        16,
+        17,
+        9,
+        10,
+        11,
+        18,
+        19,
+        20,
+        12,
+        13,
+        14,
+        21,
+        22,
+        23,
+    ],
+    "acc": [1, 2, 3, 6, 7, 8, 15, 16, 17],
+    "gyro": [9, 10, 11, 18, 19, 20],
+    "mag": [12, 13, 14, 21, 22, 23],
+}
+
+try:
+    with open(args.paramPath, "r") as file:
+        yml_file = yaml.safe_load(file)
+        modalities = yml_file["modalities"]
+        transient_dim = 4
+        output_dim = 13
+        hidden_dims = [32]
+        num_clients = yml_file["n_clients"]
+        num_sets = yml_file["n_sets"]
+
+        batch_size = yml_file["batch_size"]
+        federatedGlob = yml_file["fedGlob"]
+        federatedLoc = yml_file["fedLoc"]
+
+        learning_rate = float(yml_file["lr"])
+        momentum = 0
+        optimizer = yml_file["optim"]
+
+        alpha = 1
+        alpha_per_modality = False
+        lg_frac = yml_file["lg_frac"]
+        rounds = yml_file["rounds"]
+        local_epochs = yml_file["epochs"]
+
+except:
+    print("no yaml file given")
+    exit()
+
+data_train, data_test = get_data(
+    "/home/preslav/Projects/My-FegAvg/data/data_all.csv", 4, False
+)
+
+clients = []
+
+if federatedLoc:
+    uni_loc = SLC(all_mod, hidden_dims, transient_dim, False)
+uni_glob = MLP(transient_dim, output_dim)
+
+for i in range(num_clients):
+    glob_mod = MLP(transient_dim, output_dim)
+    local_mod = SLC(modalities[i], hidden_dims, transient_dim, False)
+
+    if federatedLoc:
+        s_dict = {}
+        local_dict = torch.load(params_loc_path + f"{i}.mp")
+        for k in local_mod.state_dict():
+            s_dict[k] = copy.deepcopy(local_dict[k])
+        local_mod.load_state_dict(s_dict)
+    if federatedGlob:
+        s_dict = {}
+        global_dict = torch.load(params_glob_path + f"{i}.mp")
+        for k in glob_mod.state_dict():
+            s_dict[k] = copy.deepcopy(global_dict[k])
+        glob_mod.load_state_dict(s_dict)
+
+    clients.append(
+        Client(
+            glob_mod,
+            local_mod,
+            DataLoader(
+                FedDataset(data_train[i % num_sets], device),
+                batch_size=batch_size,
+                shuffle=True,
+            ),
+            DataLoader(
+                FedDataset(data_test[i % num_sets], device),
+                batch_size=batch_size,
+                shuffle=True,
+            ),
+            local_epochs,
+            learning_rate,
+            optimizer,
+            device=device,
+        )
+    )
+
+
+last_entry = 0
+performance = np.zeros((num_clients, 2, rounds))
+loss = np.zeros((num_clients, 2, rounds))
+init_time = datetime.now()
+max_f1 = np.zeros(num_clients)
+last_time = datetime.now()
+# Global params for FL
+w_glob_tmp = None
+# Local params for FL
+w_loc_tmp = None
+
+for client in range(num_clients):
+    (
+        performance[client, 0, 0],
+        performance[client, 1, 0],
+        loss[client, 1, 0],
+        vec,
+    ) = clients[client].test()
+    print(vec[0])
+    # break

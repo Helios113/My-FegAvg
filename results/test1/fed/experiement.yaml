@@ -1,0 +1,18 @@
+modalities:
+  [
+    acc: [0, 1, 2, 5, 6, 7, 14, 15, 16],
+    gyro: [8, 9, 10, 17, 18, 19],
+    mag: [11, 12, 13, 20, 21, 22],
+  ]
+
+n_clients: 3
+n_sets: 1
+batch_size: 32
+fedGlob: True
+fedLoc: False
+lr: 1e-3
+
+optim: Adam
+lg_frac: 0
+rounds: 250
+epochs: 5

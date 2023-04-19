@@ -24,7 +24,7 @@ class Composite(nn.Module):
 
     def forward(self, x):
         x = self.local(x)
-        return self.glob(x)
+        return self.glob(x), x
 
 
 class LSTM(nn.Module):
@@ -105,7 +105,7 @@ class SLC(nn.Module):
         self.layer_list = nn.ModuleDict()
         self.output_dim = output_dim
         for i in modalities:
-            modalities[i] = [j - 1 for j in modalities[i]]
+            # modalities[i] = [j - 1 for j in modalities[i]]
             LSTMS = nn.ModuleList()
             layers = [len(modalities[i])] + hidden_dims + [output_dim]
             for j in range(len(layers) - 1):

@@ -36,17 +36,15 @@ class Client:
         self.train_targets = []
         self.train_predictions = []
         self.learning_rate = learning_rate
-        
-        
-        
-        self.metrics = F1Score("multiclass",num_classes=13).to(device)
+
+        self.metrics = F1Score("multiclass", num_classes=13).to(device)
 
     def load_params(self, w_glob, w_loc):
         if w_glob is not None:
             self.model.get_submodule("glob").load_state_dict(w_glob)
         if w_loc is not None:
             s_dict = {}
-            
+
             for k in (
                 self.model.get_submodule("local")
                 .get_submodule("layer_list")
@@ -56,6 +54,12 @@ class Client:
             self.model.get_submodule("local").get_submodule(
                 "layer_list"
             ).load_state_dict(s_dict)
+
+    def get_params(self):
+        return (
+            self.model.get_submodule("glob").state_dict(),
+            self.model.get_submodule("local").get_submodule("layer_list").state_dict(),
+        )
 
     def train(self):
         self.model.train()
@@ -78,7 +82,7 @@ class Client:
             for batch, data in enumerate(self.trainloader):
                 X, y = data[0], data[1]
                 optimizer.zero_grad()
-                pred = self.model(X)
+                pred, vec = self.model(X)
                 loss = F.cross_entropy(pred, y)
                 loss.backward()
                 optimizer.step()
@@ -88,7 +92,7 @@ class Client:
         return (
             self.model.get_submodule("glob").state_dict(),
             self.model.get_submodule("local").get_submodule("layer_list").state_dict(),
-            performance/len(self.trainloader),
+            performance / len(self.trainloader),
         )
 
     def test(self):
@@ -97,16 +101,20 @@ class Client:
         model.eval()
 
         num_batch = len(self.testloader)
-     
+
+        f1 = np.zeros(num_batch)
         loss = np.zeros(num_batch)
+        vec = np.zeros((num_batch, 4))
+
         with torch.no_grad():
             for batch, data in enumerate(self.testloader):
                 X, y = data[0], data[1]
-                pred = model(X)
-                print(pred.shape)
-                print(y.shape)
-                loss[batch] = self.metrics(pred,y).item()
-        return loss.mean(), loss.std()
+                pred, features = model(X)
+                f1[batch] = self.metrics(pred, y).item()
+                loss[batch] = F.cross_entropy(pred, y).item()
+                vec[batch, :] = features.cpu().squeeze()[0]
+
+        return f1.mean(), f1.std(), loss.mean(), vec
 
     def __repr__(self):
         return self.model.__repr__()

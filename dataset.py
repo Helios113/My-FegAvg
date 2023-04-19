@@ -70,7 +70,7 @@ def non_iid_data(data, num_users, classesPerClient):
 
 def load_data(path):
     data = pd.read_csv(path, header=None, index_col=False)
-    train = data.sample(frac=0.7, random_state=10)
+    train = data.sample(frac=0.7 * 0.25, random_state=10)
     test = data.drop(train.index).values
     train = train.values
     return train, test
