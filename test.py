@@ -4,7 +4,7 @@ import numpy as np
 import os
 from matplotlib.ticker import MaxNLocator
 
-main_path = "NEW_DATA/e"
+main_path = "NEW_DATA/i1"
 cmp1 = "fed"
 cmp2 = "non"
 
@@ -21,7 +21,7 @@ ax.plot(data1.iloc[:, 3:], "k-")
 
 ax.plot(data2.iloc[:, 3:], "r-")
 
-
+plt.grid(True)
 
 plt.savefig(os.path.join(main_path, "loss_train.png"))
 
@@ -41,6 +41,7 @@ ax.plot(data1.iloc[:, 3:], "k-")
 ax.plot(data2.iloc[:, 3:], "r-")
 
 
+plt.grid(True)
 
 plt.savefig(os.path.join(main_path, "loss_test.png"))
 
@@ -63,5 +64,6 @@ print(data1.iloc[:, 3:-1:2].max(axis=0))
 
 print("NO_FED:")
 print(data2.iloc[:, 3:-1:2].max(axis=0))
+plt.grid(True)
 
 plt.savefig(os.path.join(main_path, "f1.png"))

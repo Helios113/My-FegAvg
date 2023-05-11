@@ -69,17 +69,17 @@ else:
 
 
 all_mod = {
-    "all": [1, 2, 3, 6, 7, 8, 15, 16, 17, 9, 10, 11, 18, 19, 20, 12, 13, 14, 21, 22, 23],
-    "acc": [1, 2, 3, 6, 7, 8, 15, 16, 17],
-    "acc1": [1, 2, 3],
-    "acc2": [6, 7, 8],
-    "acc3": [15, 16, 17],
-    "gyro": [9, 10, 11, 18, 19, 20],
-    "gyro1": [9, 10, 11],
-    "gyro2": [18, 19, 20],
-    "mag": [12, 13, 14, 21, 22, 23],
-    "mag1": [12, 13, 14,],
-    "mag2": [ 21, 22, 23],
+    "all": [0, 1, 2, 5, 6, 7, 14, 15, 16, 8, 9, 10, 17, 18, 19, 11, 12, 13, 20, 21, 22],
+    "acc": [0, 1, 2, 5, 6, 7, 14, 15, 16],
+    "acc1": [0, 1, 2],
+    "acc2": [5, 6, 7],
+    "acc3": [14, 15, 16],
+    "gyro": [8, 9, 10, 17, 18, 19],
+    "gyro1": [8, 9, 10],
+    "gyro2": [17, 18, 19],
+    "mag": [ 11, 12, 13, 20, 21, 22],
+    "mag1": [11, 12, 13,],
+    "mag2": [ 20, 21, 22],
 }
 try:
     with open(args.paramPath, "r") as file:
@@ -227,7 +227,7 @@ for round in range(rounds):
                 w_glob_tmp = copy.deepcopy(w_glob_ret)
                 for k in w_glob_ret:
                     w_glob_tmp[k] = w_glob_tmp[k].unsqueeze(0)
-            elif train == 0:
+            else:
                 for k in w_glob_ret:
                     w_glob_tmp[k] = torch.cat((w_glob_tmp[k], w_glob_ret[k].unsqueeze(0)), dim=0)
 

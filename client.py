@@ -37,7 +37,7 @@ class Client:
         self.train_predictions = []
         self.learning_rate = learning_rate
         self.transient_dim = local.output_dim
-        self.metrics = F1Score("multiclass", num_classes=13).to(device)
+        self.metrics = F1Score("multiclass", num_classes=12).to(device)
         if self.optim == "SGD":
             self.optimizer = torch.optim.SGD(
                 self.model.parameters(), lr=self.learning_rate, momentum=self.momentum

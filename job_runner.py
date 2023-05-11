@@ -7,17 +7,17 @@ commands = [
     #     "--paramPath",
     #     "E6/p/fed/experiment.yaml",
     # ],
-    # [
-    #     "python",
-    #     "/home/preslav/Projects/My-FegAvg/server.py",
-    #     "--paramPath",
-    #     "NEW_DATA/g/fed/experiment.yaml",
-    # ],
-   [
+    [
         "python",
         "/home/preslav/Projects/My-FegAvg/server.py",
         "--paramPath",
-        "NEW_DATA/g/non/experiment.yaml",
+        "NEW_DATA/i3/fed/experiment.yaml",
+    ],
+    [
+        "python",
+        "/home/preslav/Projects/My-FegAvg/server.py",
+        "--paramPath",
+        "NEW_DATA/i3/non/experiment.yaml",
     ],
     # [
     #     "python",
