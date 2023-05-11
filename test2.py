@@ -2,7 +2,7 @@ import copy
 import torch
 from client import Client
 from models import SLC, MLP
-from dataset import FedDataset, get_data
+from dataset import FedDataset, get_data, DataInfo
 import numpy as np
 import os
 import argparse
@@ -88,20 +88,22 @@ all_mod = {
 
 try:
     with open(args.paramPath, "r") as file:
+        output_dim = 13
+
         yml_file = yaml.safe_load(file)
         modalities = yml_file["modalities"]
-        transient_dim = 4
-        output_dim = 13
-        hidden_dims = [32]
+        transient_dim = yml_file["transient_dim"]
+
+        hidden_dims = yml_file["hidden_dims"]
         num_clients = yml_file["n_clients"]
-        num_sets = yml_file["n_sets"]
+        num_sets_train = yml_file["n_sets_train"]
+        num_sets_test = yml_file["n_sets_test"]
 
         batch_size = yml_file["batch_size"]
         federatedGlob = yml_file["fedGlob"]
         federatedLoc = yml_file["fedLoc"]
 
         learning_rate = float(yml_file["lr"])
-        momentum = 0
         optimizer = yml_file["optim"]
 
         alpha = 1
@@ -109,13 +111,28 @@ try:
         lg_frac = yml_file["lg_frac"]
         rounds = yml_file["rounds"]
         local_epochs = yml_file["epochs"]
-
+        iid = yml_file["iid"]
+        penalty = yml_file["penalty"]
+        classes_per_client_training = yml_file["classes_per_client_training"]
+        classes_per_client_testing = yml_file["classes_per_client_testing"]
+        train_data_portion = yml_file["train_data_portion"]
+        test_data_portion = yml_file["test_data_portion"]
 except:
     print("no yaml file given")
     exit()
 
 data_train, data_test = get_data(
-    "/home/preslav/Projects/My-FegAvg/data/data_all.csv", 4, False
+    "/home/preslav/Projects/My-FegAvg/data/data_all.csv",
+    num_clients,
+    iid,
+    DataInfo(
+        train_data_portion,
+        test_data_portion,
+        classes_per_client_training,
+        classes_per_client_testing,
+        num_sets_train,
+        num_sets_test,
+    ),
 )
 
 clients = []
@@ -146,12 +163,12 @@ for i in range(num_clients):
             glob_mod,
             local_mod,
             DataLoader(
-                FedDataset(data_train[i % num_sets], device),
+                FedDataset(data_train[i % num_sets_train], device),
                 batch_size=batch_size,
                 shuffle=True,
             ),
             DataLoader(
-                FedDataset(data_test[i % num_sets], device),
+                FedDataset(data_test[i % num_sets_test], device),
                 batch_size=batch_size,
                 shuffle=True,
             ),

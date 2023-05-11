@@ -2,14 +2,11 @@ import copy
 import torch
 from client import Client
 from models import SLC, MLP
-from dataset import FedDataset, get_data
+from dataset import FedDataset, get_data, DataInfo
 import numpy as np
 import os
 import argparse
 from torch.utils.data import DataLoader
-import matplotlib.pyplot as plt
-from math import ceil
-import pandas as pd
 from datetime import datetime
 import yaml
 
@@ -20,9 +17,6 @@ np.random.seed(0)
 
 parser = argparse.ArgumentParser(description="DM-FedAvg")
 # Optional argument
-parser.add_argument(
-    "--split", type=float, nargs="?", default=0.7, help="Training data portion"
-)
 
 parser.add_argument(
     "--paramPath",
@@ -36,6 +30,7 @@ args = parser.parse_args()
 
 dirs = os.path.split(args.paramPath)
 save_path = dirs[0]
+parent_path = os.path.split(save_path)[0]
 # model parameters
 params_loc_path = os.path.join(save_path, "paramsLoc")
 params_glob_path = os.path.join(save_path, "paramsGlob")
@@ -44,6 +39,8 @@ loss_test_path = os.path.join(save_path, "loss_test.txt")
 f1_test_path = os.path.join(save_path, "f1_test.txt")
 info_path = os.path.join(save_path, "info.txt")
 
+glob_file = os.path.join(parent_path, "glob")
+loc_file = os.path.join(parent_path, "loc")
 
 """
 Fiels
@@ -67,55 +64,38 @@ elif torch.backends.mps.is_available():
 else:
     device = "cpu"  # Defaults to CPU if NVIDIA GPU/Apple GPU aren't available
 
-
+# device = "cpu"
 # Test parameters
 
 
 all_mod = {
-    "all": [
-        1,
-        2,
-        3,
-        6,
-        7,
-        8,
-        15,
-        16,
-        17,
-        9,
-        10,
-        11,
-        18,
-        19,
-        20,
-        12,
-        13,
-        14,
-        21,
-        22,
-        23,
-    ],
+    "all": [1, 2, 3, 6, 7, 8, 15, 16, 17, 9, 10, 11, 18, 19, 20, 12, 13, 14, 21, 22, 23],
     "acc": [1, 2, 3, 6, 7, 8, 15, 16, 17],
+    "acc1": [1, 2, 3],
+    "acc2": [6, 7, 8],
+    "acc3": [15, 16, 17],
     "gyro": [9, 10, 11, 18, 19, 20],
+    "gyro1": [9, 10, 11],
+    "gyro2": [18, 19, 20],
     "mag": [12, 13, 14, 21, 22, 23],
+    "mag1": [12, 13, 14,],
+    "mag2": [ 21, 22, 23],
 }
-
 try:
     with open(args.paramPath, "r") as file:
         yml_file = yaml.safe_load(file)
         modalities = yml_file["modalities"]
-        transient_dim = 4
-        output_dim = 13
-        hidden_dims = [32]
+
+        hidden_dims = yml_file["hidden_dims"]
         num_clients = yml_file["n_clients"]
-        num_sets = yml_file["n_sets"]
+        num_sets_train = yml_file["n_sets_train"]
+        num_sets_test = yml_file["n_sets_test"]
 
         batch_size = yml_file["batch_size"]
         federatedGlob = yml_file["fedGlob"]
         federatedLoc = yml_file["fedLoc"]
 
         learning_rate = float(yml_file["lr"])
-        momentum = 0
         optimizer = yml_file["optim"]
 
         alpha = 1
@@ -123,157 +103,84 @@ try:
         lg_frac = yml_file["lg_frac"]
         rounds = yml_file["rounds"]
         local_epochs = yml_file["epochs"]
-
+        iid = yml_file["iid"]
+        penalty = yml_file["penalty"]
+        classes_per_client_training = yml_file["classes_per_client_training"]
+        classes_per_client_testing = yml_file["classes_per_client_testing"]
+        train_data_portion = yml_file["train_data_portion"]
+        test_data_portion = yml_file["test_data_portion"]
+        mlp_dims = yml_file["mlp_dims"]
+        transient_dim = mlp_dims[0]
+        output_dim=mlp_dims[-1]
+        train = yml_file["train"]
+        data_path = yml_file["data_path"]
+except Exception as e:
+    print(e)
 except:
     print("no yaml file given")
     exit()
-# modalities = [
-#     {
-#         "all": [
-#             1,
-#             2,
-#             3,
-#             6,
-#             7,
-#             8,
-#             15,
-#             16,
-#             17,
-#             9,
-#             10,
-#             11,
-#             18,
-#             19,
-#             20,
-#             12,
-#             13,
-#             14,
-#             21,
-#             22,
-#             23,
-#         ],
-#     },
-#     {
-#         "all": [
-#             1,
-#             2,
-#             3,
-#             6,
-#             7,
-#             8,
-#             15,
-#             16,
-#             17,
-#             9,
-#             10,
-#             11,
-#             18,
-#             19,
-#             20,
-#             12,
-#             13,
-#             14,
-#             21,
-#             22,
-#             23,
-#         ],
-#     },
-#     {
-#         "all": [
-#             1,
-#             2,
-#             3,
-#             6,
-#             7,
-#             8,
-#             15,
-#             16,
-#             17,
-#             9,
-#             10,
-#             11,
-#             18,
-#             19,
-#             20,
-#             12,
-#             13,
-#             14,
-#             21,
-#             22,
-#             23,
-#         ],
-#     },
-#     {
-#         "all": [
-#             1,
-#             2,
-#             3,
-#             6,
-#             7,
-#             8,
-#             15,
-#             16,
-#             17,
-#             9,
-#             10,
-#             11,
-#             18,
-#             19,
-#             20,
-#             12,
-#             13,
-#             14,
-#             21,
-#             22,
-#             23,
-#         ],
-#     },
-# ]
 
 print(r"{:-^30}".format("PID"), file=info_f)
 print(r"{txt:<20}:{val}".format(txt="pid", val=os.getpid()), file=info_f)
-print(args, file=info_f)
+print(yml_file, file=info_f)
 print(modalities, file=info_f)
-info_f.flush()
+print(datetime.now(), file=info_f)
+
 
 data_train, data_test = get_data(
-    "/home/preslav/Projects/My-FegAvg/data/data_all.csv", 4, False
+    data_path,
+    num_clients,
+    iid,
+    DataInfo(
+        train_data_portion,
+        test_data_portion,
+        classes_per_client_training,
+        classes_per_client_testing,
+        num_sets_train,
+        num_sets_test,
+    ),
 )
-
+info_f.flush()
 clients = []
 
-if federatedLoc:
-    uni_loc = SLC(all_mod, hidden_dims, transient_dim, False)
-uni_glob = MLP(transient_dim, output_dim)
-
+uni_loc = SLC(all_mod, hidden_dims, transient_dim, penalty)
+uni_glob = MLP(mlp_dims)
+if os.path.exists(glob_file):
+    uni_glob.load_state_dict(torch.load(glob_file))
+else:
+    torch.save(uni_glob.state_dict(),glob_file)
+if os.path.exists(loc_file):
+    uni_loc.load_state_dict(torch.load(loc_file))
+else:
+    torch.save(uni_loc.state_dict(),loc_file)
+    
 for i in range(num_clients):
-    glob_mod = MLP(transient_dim, output_dim)
-    local_mod = SLC(modalities[i], hidden_dims, transient_dim, False)
-    if federatedLoc:
-        s_dict = {}
-        local_dict = uni_loc.state_dict()
-        for k in local_mod.state_dict():
-            s_dict[k] = copy.deepcopy(local_dict[k])
-        local_mod.load_state_dict(s_dict)
-    if federatedGlob:
-        s_dict = {}
-        global_dict = uni_glob.state_dict()
-        for k in glob_mod.state_dict():
-            s_dict[k] = copy.deepcopy(global_dict[k])
-        glob_mod.load_state_dict(s_dict)
+    glob_mod = MLP(mlp_dims)
+    local_mod = SLC(modalities[i], hidden_dims, transient_dim, penalty)
+    
+    s_dict = {}
+    local_dict = uni_loc.state_dict()
+    for k in local_mod.state_dict():
+        s_dict[k] = copy.deepcopy(local_dict[k])
+    local_mod.load_state_dict(s_dict)
+    s_dict = {}
+    global_dict = uni_glob.state_dict()
+    for k in glob_mod.state_dict():
+        s_dict[k] = copy.deepcopy(global_dict[k])
+    glob_mod.load_state_dict(s_dict)
 
     clients.append(
         Client(
             glob_mod,
             local_mod,
             DataLoader(
-                FedDataset(data_train[i % num_sets], device),
+                FedDataset(data_train[i % num_sets_train], device),
                 batch_size=batch_size,
                 shuffle=True,
             ),
             DataLoader(
-                FedDataset(data_test[i % num_sets], device),
-                batch_size=batch_size,
+                FedDataset(data_test[i % num_sets_test], device),
+                batch_size=32,
                 shuffle=True,
             ),
             local_epochs,
@@ -298,11 +205,16 @@ for round in range(rounds):
 
     # Count of encounters of each param
     w_loc_tmp_count = None
-    if round > (1 - lg_frac) * rounds:
-        federatedLoc = False
+    # if round > (1 - lg_frac) * rounds:
+    #     federatedGlob = True
 
     for client in range(num_clients):
-        w_glob_ret, w_local_ret, loss[client, 0, round] = clients[client].train()
+        if train == 0:
+            w_glob_ret, w_local_ret, loss[client,
+                                        0, round] = clients[client].train()
+        else:
+            w_glob_ret, w_local_ret, loss[client,
+                                        0, round] = clients[client].train2(client)
         (
             performance[client, 0, round],
             performance[client, 1, round],
@@ -313,14 +225,17 @@ for round in range(rounds):
         if federatedGlob:
             if w_glob_tmp is None:
                 w_glob_tmp = copy.deepcopy(w_glob_ret)
-            else:
                 for k in w_glob_ret:
-                    w_glob_tmp[k] += w_glob_ret[k]
+                    w_glob_tmp[k] = w_glob_tmp[k].unsqueeze(0)
+            elif train == 0:
+                for k in w_glob_ret:
+                    w_glob_tmp[k] = torch.cat((w_glob_tmp[k], w_glob_ret[k].unsqueeze(0)), dim=0)
 
         if federatedLoc:
             if alpha_per_modality:
                 factor = (
-                    1 if len(w_local_ret) / 8 == 1 else len(w_local_ret) / 8 * alpha
+                    1 if len(w_local_ret) /
+                    8 == 1 else len(w_local_ret) / 8 * alpha
                 )
             else:
                 factor = 1 if len(w_local_ret) / 8 == 1 else alpha
@@ -340,10 +255,12 @@ for round in range(rounds):
         if performance[client, 0, round] > max_f1[client]:
             max_f1[client] = performance[client, 0, round]
             torch.save(
-                clients[client].get_params()[0], params_glob_path + f"{client}.mp"
+                clients[client].get_params()[0], params_glob_path +
+                f"{client}.mp"
             )
             torch.save(
-                clients[client].get_params()[1], params_loc_path + f"{client}.mp"
+                clients[client].get_params()[1], params_loc_path +
+                f"{client}.mp"
             )
 
     train_loss = np.char.mod("%f", loss[:, 0, round].reshape(-1))
@@ -376,16 +293,18 @@ for round in range(rounds):
     # get weighted average for global weights
     if federatedGlob:
         for k in w_glob_tmp.keys():
-            w_glob_tmp[k] = torch.div(w_glob_tmp[k], num_clients)
+            w_glob_tmp[k] = torch.mean(w_glob_tmp[k], 0, False).squeeze(0)
     if federatedLoc:
+        # TODO FIx like above
         for k in w_loc_tmp.keys():
-            w_loc_tmp[k] = torch.div(w_loc_tmp[k], w_loc_tmp_count[k])
+            w_loc_tmp[k] = torch.mean(w_loc_tmp[k], dim=0, keepdim=False)
 
     # copy weights to each client based on mode
     if federatedGlob or federatedLoc:
         for client in range(num_clients):
             clients[client].load_params(w_glob_tmp, w_loc_tmp)
 
-    lss_train_f.flush()
-    lss_test_f.flush()
-    f1_test_f.flush()
+    if round%10==0:
+        lss_train_f.flush()
+        lss_test_f.flush()
+        f1_test_f.flush()

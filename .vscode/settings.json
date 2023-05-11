@@ -1,8 +1,8 @@
 {
     "python.formatting.provider": "none",
-    "editor.formatOnSave": true,
+    "editor.formatOnSave": false,
     "[python]": {
-        "editor.defaultFormatter": "ms-python.black-formatter"
+        "editor.defaultFormatter": "ms-python.autopep8"
     },
     "cSpell.words": [
         "inds"

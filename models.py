@@ -52,10 +52,15 @@ class LSTM(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, input_dim, output_dim):
+    def __init__(self, dims):
         super(MLP, self).__init__()
-
-        self.linear = nn.Linear(input_dim, output_dim)
+        layers = []
+        for i in range(len(dims)-2):
+            layers.append(nn.Linear(dims[i], dims[i+1]))
+            layers.append(nn.Dropout())    
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(dims[-2], dims[-1]))
+        self.linear = nn.Sequential(*layers)
 
     def forward(self, x):
         x = x.squeeze(0)
@@ -105,19 +110,13 @@ class SLC(nn.Module):
         self.layer_list = nn.ModuleDict()
         self.output_dim = output_dim
         for i in modalities:
-            # modalities[i] = [j - 1 for j in modalities[i]]
-            LSTMS = nn.ModuleList()
-            layers = [len(modalities[i])] + hidden_dims + [output_dim]
-            for j in range(len(layers) - 1):
-                LSTMS.append(
-                    nn.LSTM(
-                        input_size=layers[j],
-                        hidden_size=layers[j + 1],
+            self.layer_list[i] = nn.LSTM(
+                        input_size = len(modalities[i]),
+                        hidden_size = output_dim,
+                        num_layers = hidden_dims,
                         batch_first=True,
+                        dropout = 0.5
                     )
-                )
-
-            self.layer_list[i] = LSTMS
 
     def forward(self, x):
         h = None
@@ -126,20 +125,20 @@ class SLC(nn.Module):
         size = len(self.modalities)
         for i in self.modalities:
             X = x[..., self.modalities[i]]
-            for j, layer in enumerate(self.layer_list[i]):
-                X, (h_n, c_n) = layer(X)
+            X, (h_n, c_n) = self.layer_list[i](X)
+            h_n=h_n[-1]
             h_list.append(h_n)
             if h == None:
                 h = h_n / size
             else:
                 h += h_n / size
-        for comb in combinations(h_list, 2):
-            if penalty is None:
-                penalty = torch.abs(comb[0] - comb[1])
-            else:
-                penalty += torch.abs(comb[0] - comb[1])
-        if penalty is None:
-            penalty = torch.zeros_like(h)
         if self.penalty:
+            for comb in combinations(h_list, 2):
+                if penalty is None:
+                    penalty = torch.abs(comb[0] - comb[1])
+                else:
+                    penalty += torch.abs(comb[0] - comb[1])
+            if penalty is None:
+                penalty = torch.zeros_like(h)
             return h - penalty
         return h

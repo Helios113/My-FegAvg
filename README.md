@@ -23,3 +23,8 @@ The MHealthDataset class reads the MHealth dataset and loads it into a pytorch u
 Models script stores different models used by the client devices to train models.
 ## Data handler
 Data_handler script conditions the raw data from MHealth and saves it for loading into the MHealthDataset class.
+
+
+
+
+600x8 = 3200

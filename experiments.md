@@ -16,3 +16,10 @@ What is important is to check if the vectors are the same after training.
 We need to compare the 4 different modalities on the same device. Unimodal vs UniMFed. Then look at the feature vector; iid and non iid
 We need to compare multi m fed vs 4 clinents with early fusion iid and non-iid
 We need to compare unim-fed vs 4 modalities on seperate devices - prob will such, but still look at the feature vectors
+
+
+
+UPDATE:
+1. UniM fed works as expected
+    Check how the vectors look, prelim results show wrong numbers
+    Make runner pick data as well as modality 

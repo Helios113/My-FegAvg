@@ -1,4 +1,0 @@
--------------PID--------------
-pid                 :607728
-Namespace(split=0.7, paramPath='results/test1/fed/experiement.yaml')
-[{'acc': [0, 1, 2, 5, 6, 7, 14, 15, 16]}, {'gyro': [8, 9, 10, 17, 18, 19]}, {'mag': [11, 12, 13, 20, 21, 22]}]
