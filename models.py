@@ -26,31 +26,6 @@ class Composite(nn.Module):
         x = self.local(x)
         return self.glob(x), x
 
-
-class LSTM(nn.Module):
-    def __init__(self, input_dim, hidden_dims, output_dim):
-        super(LSTM, self).__init__()
-
-        input_dim = np.array(input_dim).flatten()
-        self.layers = [len(input_dim)] + hidden_dims + [output_dim]
-        self.layer_size = len(self.layers) - 1
-        self.layer_list = nn.ModuleList()
-        for i in range(self.layer_size):
-            self.layer_list.append(
-                nn.LSTM(
-                    input_size=self.layers[i],
-                    hidden_size=self.layers[i + 1],
-                    batch_first=True,
-                )
-            )
-
-    def forward(self, x):
-        h_n = None
-        for i, layer in enumerate(self.layer_list):
-            x, (h_n, c_n) = layer(x)
-        return h_n
-
-
 class MLP(nn.Module):
     def __init__(self, dims):
         super(MLP, self).__init__()
@@ -141,4 +116,84 @@ class SLC(nn.Module):
             if penalty is None:
                 penalty = torch.zeros_like(h)
             return h - penalty
+        return h
+
+
+class FSTM(nn.Module):
+    def __init__(self, modalities: dict, output_dim):
+        super(FSTM, self).__init__()
+        self.modalities = modalities
+        self.layer_list = nn.ModuleDict()
+        self.output_dim = output_dim
+        for i in modalities:
+            self.layer_list[i] = nn.LSTM(
+                        input_size = len(modalities[i]),
+                        hidden_size = output_dim,
+                        num_layers = 1,
+                        batch_first=True
+                    )
+            
+    def forward(self, x):
+        h = None
+        h_list = []
+        penalty = None
+        size = len(self.modalities)
+        h = torch.zeros(x.shape[0], self.output_dim, len(self.modalities))
+        for cnt,i in enumerate(self.modalities):
+            X = x[..., self.modalities[i]]
+            X, (h_n, c_n) = self.layer_list[i](X)
+            h[...,cnt] = h_n.squeeze(0)
+        return h
+
+    
+
+class HEY(nn.Module):
+    def __init__(self, modalities: dict, hidden_dims, output_dim, penalty, dims):
+        super(HEY, self).__init__()
+        self.penalty = penalty
+        self.modalities = modalities
+        self.output_dim = output_dim
+        
+        self.layer_list = nn.ModuleDict()
+        for i in modalities:
+            self.layer_list[i] = nn.LSTM(
+                        input_size = output_dim,
+                        hidden_size = 12,
+                        num_layers = 1,
+                        batch_first=True,
+                    )
+        # layers = []
+        # for i in range(len(dims)-2):
+        #     layers.append(nn.Linear(dims[i], dims[i+1]))
+        #     layers.append(nn.Dropout())    
+        #     layers.append(nn.ReLU())
+        # layers.append(nn.Linear(dims[-2], dims[-1]))
+        # self.linear_l = nn.Sequential(*layers)
+    def forward(self, x):
+        h = None
+        h_list = []
+        penalty = None
+        size = len(self.modalities)
+        for cnt,i in enumerate(self.modalities):
+            X = x[..., cnt]
+            lstm_layer = self.layer_list[i]
+            X, (h_n, c_n) = lstm_layer(X)
+            h_n=h_n[-1]
+            h_list.append(h_n)
+            if h == None:
+                h = h_n / size
+            else:
+                h += h_n / size
+        if self.penalty:
+            for comb in combinations(h_list, 2):
+                if penalty is None:
+                    penalty = torch.abs(comb[0] - comb[1])
+                else:
+                    penalty += torch.abs(comb[0] - comb[1])
+            if penalty is None:
+                penalty = torch.zeros_like(h)
+            h = h - penalty
+            
+        h = h.squeeze(0)
+        h = self.linear_l(h)
         return h

@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--paramPath",
-                "NEW_DATA/f/fed/experiment.yaml"
+                "NEW_DATA/preslav/fed/experiment.yaml"
             ],
             "justMyCode": true
         }

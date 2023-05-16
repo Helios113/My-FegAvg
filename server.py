@@ -37,6 +37,8 @@ params_glob_path = os.path.join(save_path, "paramsGlob")
 loss_train_path = os.path.join(save_path, "loss_train.txt")
 loss_test_path = os.path.join(save_path, "loss_test.txt")
 f1_test_path = os.path.join(save_path, "f1_test.txt")
+acc_test_path = os.path.join(save_path, "acc_test.txt")
+
 info_path = os.path.join(save_path, "info.txt")
 
 glob_file = os.path.join(parent_path, "glob")
@@ -52,6 +54,8 @@ lss_train_f = open(loss_train_path, "w+")
 lss_test_f = open(loss_test_path, "w+")
 
 f1_test_f = open(f1_test_path, "w+")
+acc_test_f = open(acc_test_path, "w+")
+
 info_f = open(info_path, "w+")
 test_freq = 1
 
@@ -193,6 +197,7 @@ for i in range(num_clients):
 
 last_entry = 0
 performance = np.zeros((num_clients, 2, rounds))
+acc = np.zeros((num_clients, 2, rounds))
 loss = np.zeros((num_clients, 2, rounds))
 init_time = datetime.now()
 max_f1 = np.zeros(num_clients)
@@ -209,17 +214,14 @@ for round in range(rounds):
     #     federatedGlob = True
 
     for client in range(num_clients):
-        if train == 0:
-            w_glob_ret, w_local_ret, loss[client,
-                                        0, round] = clients[client].train()
-        else:
-            w_glob_ret, w_local_ret, loss[client,
-                                        0, round] = clients[client].train2(client)
+       
+        w_glob_ret, w_local_ret, loss[client,
+                                        0, round] = clients[client].train(train, round)
         (
             performance[client, 0, round],
             performance[client, 1, round],
-            loss[client, 1, round],
-            _,
+            acc[client, 0, round],
+            acc[client, 1, round],_
         ) = clients[client].test()
 
         if federatedGlob:
@@ -232,24 +234,16 @@ for round in range(rounds):
                     w_glob_tmp[k] = torch.cat((w_glob_tmp[k], w_glob_ret[k].unsqueeze(0)), dim=0)
 
         if federatedLoc:
-            if alpha_per_modality:
-                factor = (
-                    1 if len(w_local_ret) /
-                    8 == 1 else len(w_local_ret) / 8 * alpha
-                )
-            else:
-                factor = 1 if len(w_local_ret) / 8 == 1 else alpha
-
             if w_loc_tmp is None:
                 w_loc_tmp = {}
                 w_loc_tmp_count = {}
             for k in w_local_ret.keys():
                 if k not in w_loc_tmp:
-                    w_loc_tmp[k] = factor * w_local_ret[k]
-                    w_loc_tmp_count[k] = factor
+                    w_loc_tmp[k] =  w_local_ret[k]
+                    w_loc_tmp_count[k] = 1
                 else:
-                    w_loc_tmp[k] += factor * w_local_ret[k]
-                    w_loc_tmp_count[k] += factor
+                    w_loc_tmp[k] +=  w_local_ret[k]
+                    w_loc_tmp_count[k] += 1
 
     for client in range(num_clients):
         if performance[client, 0, round] > max_f1[client]:
@@ -268,6 +262,9 @@ for round in range(rounds):
 
     mean_std = np.char.mod("%f", performance[:, :, round].reshape(-1))
     mean_std = ",".join(mean_std)
+    
+    mean_std1 = np.char.mod("%f", acc[:, :, round].reshape(-1))
+    mean_std1 = ",".join(mean_std1)
 
     test_loss = np.char.mod("%f", loss[:, 1, round].reshape(-1))
     test_loss = ",".join(test_loss)
@@ -289,15 +286,20 @@ for round in range(rounds):
         ),
         file=f1_test_f,
     )
+    print(
+        r"{},{},{},{} ".format(
+            datetime.now() - init_time, datetime.now() - last_time, round, mean_std1
+        ),
+        file=acc_test_f,
+    )
 
     # get weighted average for global weights
     if federatedGlob:
         for k in w_glob_tmp.keys():
             w_glob_tmp[k] = torch.mean(w_glob_tmp[k], 0, False).squeeze(0)
     if federatedLoc:
-        # TODO FIx like above
         for k in w_loc_tmp.keys():
-            w_loc_tmp[k] = torch.mean(w_loc_tmp[k], dim=0, keepdim=False)
+            w_loc_tmp[k] = torch.div(w_loc_tmp[k], w_loc_tmp_count[k])
 
     # copy weights to each client based on mode
     if federatedGlob or federatedLoc:
@@ -308,3 +310,4 @@ for round in range(rounds):
         lss_train_f.flush()
         lss_test_f.flush()
         f1_test_f.flush()
+        acc_test_f.flush()
