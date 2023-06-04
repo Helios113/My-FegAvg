@@ -1,0 +1,21 @@
+\begin{{table}}[htbp]
+    \centering
+    \caption{{}}
+    \rowcolors{{2}}{{gray!10}}{{white}}
+    \begin{{tabular}}{{|c|c|c|c|c|c|c|}}
+      \hline
+      \textbf{{Ex1}} & \multicolumn{{2}}{{c|}}{{Set 1 $[F_1]$}}&\multicolumn{{2}}{{c|}}{{Set 2 $[F_1]$}}& \multicolumn{{2}}{{c|}}{{$\Delta$[\%]}}\\
+      \hline
+         &$\mu$&$\sigma$&$\mu$&$\sigma$&$\mu$&$\sigma$\\
+      \hline
+       Dev 1 &{0:.4f}&{3:.5f}&{6:.4f}&{9:.5f}&\cellcolor{{{12}!25}}{15:.2f}&-\cellcolor{{{18}!25}}{21:.2f}\\
+       \hline
+        Dev 2 &{1:.4f}&{4:.5f}&{7:.4f}&{10:.5f}&\cellcolor{{{13}!25}}{16:.2f}& \cellcolor{{{19}!25}}{22:.2f}\\
+       \hline
+        Dev 3 &{2:.4f}&{5:.5f}&{8:.4f}&{11:.5f}&\cellcolor{{{14}!25}}{17:.2f}&\cellcolor{{{20}!25}}{23:.2f}\\
+       \hline
+       Average &\multicolumn{{4}}{{c|}}{{}}&\cellcolor{{{24}!25}}{25:.2f}&\cellcolor{{{26}!25}}{27:.2f}\\
+       \hline
+    \end{{tabular}}
+    \label{{tab:ex1}}
+\end{{table}}

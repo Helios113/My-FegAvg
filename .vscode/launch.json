@@ -8,11 +8,11 @@
             "name": "Python",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/server.py",
+            "program": "${workspaceFolder}/server_c.py",
             "console": "integratedTerminal",
             "args": [
                 "--paramPath",
-                "NEW_DATA/preslav/fed/experiment.yaml"
+                "T2/g2/fed/ex.yaml"
             ],
             "justMyCode": true
         }

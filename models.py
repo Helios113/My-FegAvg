@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from itertools import combinations
+import copy
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -101,21 +102,22 @@ class SLC(nn.Module):
         for i in self.modalities:
             X = x[..., self.modalities[i]]
             X, (h_n, c_n) = self.layer_list[i](X)
-            h_n=h_n[-1]
+            h_n = h_n[-1]
             h_list.append(h_n)
-            if h == None:
-                h = h_n / size
+            if h is not None:
+                h += h_n
             else:
-                h += h_n / size
+                h = h_n
+        h = h/len(self.modalities)
         if self.penalty:
             for comb in combinations(h_list, 2):
                 if penalty is None:
                     penalty = torch.abs(comb[0] - comb[1])
                 else:
-                    penalty += torch.abs(comb[0] - comb[1])
+                    penalty = torch.add(penalty, torch.abs(comb[0] - comb[1]))
             if penalty is None:
                 penalty = torch.zeros_like(h)
-            return h - penalty
+            return torch.subtract(h, penalty)
         return h
 
 
@@ -147,7 +149,6 @@ class FSTM(nn.Module):
 
     
 
-class HEY(nn.Module):
     def __init__(self, modalities: dict, hidden_dims, output_dim, penalty, dims):
         super(HEY, self).__init__()
         self.penalty = penalty

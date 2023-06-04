@@ -17,22 +17,50 @@ commands = [
     # [
     #     "python",
     #     "/home/preslav/Projects/My-FegAvg/server.py",
-    #     "--paramPath",
+    #     "--paramPath",top
     #     "NEW_DATA_M/a/non/experiment.yaml",
 
     # ]
-     [
+    # [
+    #     "python",
+    #     "/home/preslav/Projects/My-FegAvg/server.py",
+    #     "--paramPath",
+    #     "NEW_DATA/joshua/fed/experiment.yaml",
+
+    # ],
+    # [
+    #     "python",
+    #     "/home/preslav/Projects/My-FegAvg/server.py",
+    #     "--paramPath",
+    #     "NEW_DATA/emmanuelF3_2/fed/experiment.yaml",
+
+    # ],
+    # [
+    #     "python",
+    #     "/home/preslav/Projects/My-FegAvg/server.py",
+    #     "--paramPath",
+    #     "NEW_DATA/emmanuelF3_2/fed1/experiment.yaml",
+
+    # ],
+    # [
+    #     "python",
+    #     "/home/preslav/Projects/My-FegAvg/server.py",
+    #     "--paramPath",
+    #     "T1/c0/fed/ex.yaml",
+
+    # ],
+    [
         "python",
         "/home/preslav/Projects/My-FegAvg/server.py",
         "--paramPath",
-        "NEW_DATA/emmanuel2/fed/experiment.yaml",
+        "T2/g1-1/fed/ex.yaml",
 
     ],
-     [
+    [
         "python",
         "/home/preslav/Projects/My-FegAvg/server.py",
         "--paramPath",
-        "NEW_DATA/emmanuel2/non/experiment.yaml",
+        "T2/g1-1/non/ex.yaml",
 
     ]
 ]

@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 import numpy as np
 from torchmetrics.classification import F1Score, Accuracy
 
+
 class Client:
     def __init__(
         self,
@@ -51,7 +52,8 @@ class Client:
                 self.glob.parameters(), lr=self.learning_rate, momentum=self.momentum
             )
         elif self.optim == "Adam":
-            self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+            self.optimizer = torch.optim.Adam(
+                self.model.parameters(), lr=self.learning_rate)
             self.lopt = torch.optim.Adam(
                 self.loc.parameters(), lr=self.learning_rate)
             self.gopt = torch.optim.Adam(
@@ -78,10 +80,13 @@ class Client:
     def get_params(self):
         return (
             self.model.get_submodule("glob").state_dict(),
-            self.model.get_submodule("local").get_submodule("layer_list").state_dict(),
+            self.model.get_submodule("local").get_submodule(
+                "layer_list").state_dict(),
         )
 
     def train(self, t, r):
+        np.random.seed(0)
+        torch.manual_seed(0)
         self.model.train()
 
         num_batch = len(self.trainloader)
@@ -92,35 +97,35 @@ class Client:
             batch_pred = []
             for batch, data in enumerate(self.trainloader):
                 X, y = data[0], data[1]
-                if t==0:
+                if t == 0:
                     self.optimizer.zero_grad()
-                elif t==1 or t==2:
+                else:
                     self.lopt.zero_grad()
                     self.gopt.zero_grad()
-                
+
                 pred, vec = self.model(X)
                 loss = F.cross_entropy(pred, y)
                 loss.backward()
-                if t==0:
-                    self.optimizer.step() 
-                elif t==1:
-                    if r%2==0:
-                        self.lopt.step() 
+                if t == 0:
+                    self.optimizer.step()
+                elif t == 1:
+                    if r % 2 == 0:
+                        self.lopt.step()
                     else:
-                        self.gopt.step() 
-                elif t==2:
-                    self.lopt.step() 
-                    self.gopt.step() 
-                
-                
+                        self.gopt.step()
+                else:
+                    self.lopt.step()
+                    self.gopt.step()
+
                 performance += loss.item()
 
         return (
             self.model.get_submodule("glob").state_dict(),
-            self.model.get_submodule("local").get_submodule("layer_list").state_dict(),
+            self.model.get_submodule("local").get_submodule(
+                "layer_list").state_dict(),
             performance / (len(self.trainloader)*self.epochs),
         )
-        
+
     def test(self):
         model = self.model
 

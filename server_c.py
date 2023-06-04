@@ -67,6 +67,8 @@ elif torch.backends.mps.is_available():
     device = "mps"  # Apple GPU
 else:
     device = "cpu"  # Defaults to CPU if NVIDIA GPU/Apple GPU aren't available
+    
+
 
 # Test parameters
 
@@ -213,15 +215,13 @@ loss = np.zeros((num_clients, 2, rounds))
 init_time = datetime.now()
 max_f1 = np.zeros(num_clients)
 
-w_local_ret = None
-w_glob_ret = None
 
+
+glob_list = [None]*num_clients
+loc_list = [None]*num_clients
 for round in range(rounds):
     last_time = datetime.now()
-    # Global params for FL
-    w_glob_tmp = None
-    # Local params for FL
-    w_loc_tmp = None
+
 
     # Count of encounters of each param
     w_loc_tmp_count = None
@@ -241,25 +241,9 @@ for round in range(rounds):
         ) = clients[client].test()
 
         if federatedGlob:
-            if w_glob_tmp is None:
-                w_glob_tmp = copy.deepcopy(w_glob_ret)
-                for k in w_glob_ret:
-                    w_glob_tmp[k] = w_glob_tmp[k].unsqueeze(0)
-            else:
-                for k in w_glob_ret:
-                    w_glob_tmp[k] = torch.cat((w_glob_tmp[k], w_glob_ret[k].unsqueeze(0)), dim=0)
-
+            glob_list[client] = copy.deepcopy(w_glob_ret)
         if federatedLoc:
-            if w_loc_tmp is None:
-                w_loc_tmp = {}
-                w_loc_tmp_count = {}
-            for k in w_local_ret.keys():
-                if k not in w_loc_tmp:
-                    w_loc_tmp[k] =  w_local_ret[k]
-                    w_loc_tmp_count[k] = 1
-                else:
-                    w_loc_tmp[k] +=  w_local_ret[k]
-                    w_loc_tmp_count[k] += 1
+            loc_list[client] = copy.deepcopy(w_local_ret)
 
     for client in range(num_clients):
         if performance[client, 0, round] > max_f1[client]:
@@ -310,17 +294,40 @@ for round in range(rounds):
     )
 
     # get weighted average for global weights
-    if federatedGlob:
-        for k in w_glob_tmp.keys():
-            w_glob_tmp[k] = torch.mean(w_glob_tmp[k], 0, False).squeeze(0)
-    if federatedLoc:
-        for k in w_loc_tmp.keys():
-            w_loc_tmp[k] = torch.div(w_loc_tmp[k], w_loc_tmp_count[k])
-
+    for devs in corr:
+        w_glob_tmp = None
+        w_loc_tmp = None
+        for l in devs:
+            if federatedGlob:
+                if w_glob_tmp is None:
+                    w_glob_tmp = copy.deepcopy(glob_list[l])
+                    for k in w_glob_tmp:
+                        w_glob_tmp[k] = w_glob_tmp[k].unsqueeze(0)
+                else:
+                    for k in w_glob_tmp:
+                        w_glob_tmp[k] = torch.cat((w_glob_tmp[k], glob_list[l][k].unsqueeze(0)), dim=0)
+            if federatedLoc:
+                if w_loc_tmp is None:
+                    w_loc_tmp = {}
+                    w_loc_tmp_count = {}
+                for k in loc_list[l].keys():
+                    if k not in w_loc_tmp:
+                        w_loc_tmp[k] =  loc_list[l][k]
+                        w_loc_tmp_count[k] = 1
+                    else:
+                        w_loc_tmp[k] +=  loc_list[l][k]
+                        w_loc_tmp_count[k] += 1
+        if federatedGlob:
+            for k in w_glob_tmp.keys():
+                w_glob_tmp[k] = torch.mean(w_glob_tmp[k], 0, False).squeeze(0)
+        if federatedLoc:
+            for k in w_loc_tmp.keys():
+                w_loc_tmp[k] = torch.div(w_loc_tmp[k], w_loc_tmp_count[k])
+        for l in devs:
+            clients[l].load_params(w_glob_tmp, w_loc_tmp)
+        
+        
     # copy weights to each client based on mode
-    if federatedGlob or federatedLoc:
-        for client in range(num_clients):
-            clients[client].load_params(w_glob_tmp, w_loc_tmp)
 
     if round%10==0:
         lss_train_f.flush()

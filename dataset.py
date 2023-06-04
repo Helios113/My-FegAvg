@@ -77,41 +77,58 @@ def iid_data(data, num_users):
     return dict_users
 
 
-def non_iid_data(data, num_users, classesPerClient, initialK = None):
+def non_iid_data(daTa, num_users, classesPerClient, initialK = None):
     np.random.seed(0)
     torch.manual_seed(0)
     random.seed(0)
-    unique_classes = np.unique(data[:, -1])
-    number_classes = len(unique_classes)
-    inds = {}
-    for c in unique_classes:
-        inds[c] = np.where(data[:, -1] == c)[0].tolist()
-    data_size = len(data)
-    budgetPerClass = np.ceil(data_size / (num_users * classesPerClient))
+    if type(daTa) != list:
+        daTa = [daTa]
+    if len(daTa) == num_users:
+        num_users = 1
     dict_users = {}
-    for i in range(num_users):
-        dict_users[i] = None
-        budgetPerDevice = data_size // (num_users - i)
-        data_size -= budgetPerDevice
-        if initialK < 0:
-            k = random.randint(0, number_classes - 1)
-        else:
-            k = initialK
-        while budgetPerDevice > 0:
-            t = int(min(budgetPerDevice, budgetPerClass, len(inds[k])))
-            budgetPerDevice -= t
-            B = np.flip(np.sort(random.sample(range(len(inds[k])), t)))
-            for j in B:
-                if dict_users[i] is None:
-                    dict_users[i] = data[inds[k].pop(j)]
-                else:
-                    dict_users[i] = np.vstack((dict_users[i], data[inds[k].pop(j)]))
-            k = (k + 1) % number_classes
+    for cnt, data in enumerate(daTa):
+        unique_classes = np.unique(data[:, -1])
+        number_classes = len(unique_classes)
+        inds = {}
+        for c in unique_classes:
+            inds[c] = np.where(data[:, -1] == c)[0].tolist()
+        data_size = len(data)
+        budgetPerClass = np.ceil(data_size / (num_users * classesPerClient))
+        for i in range(num_users):
+            dict_users[cnt+i] = None
+            budgetPerDevice = data_size // (num_users - i)
+            data_size -= budgetPerDevice
+            if initialK < 0:
+                k = random.randint(0, number_classes - 1)
+            else:
+                k = initialK
+            while budgetPerDevice > 0:
+                t = int(min(budgetPerDevice, budgetPerClass, len(inds[k])))
+                budgetPerDevice -= t
+                B = np.flip(np.sort(random.sample(range(len(inds[k])), t)))
+                for j in B:
+                    if dict_users[cnt+i] is None:
+                        dict_users[cnt+i] = data[inds[k].pop(j)]
+                    else:
+                        dict_users[cnt+i] = np.vstack((dict_users[cnt+i], data[inds[k].pop(j)]))
+                k = (k + 1) % number_classes
 
     return dict_users
 
 
 def load_data(path, train_data_portion, test_data_portion):
+    if type(path) == list:
+        train = []
+        test = []
+        for i in path:
+            tmp = pd.read_csv(i, header=None, index_col=False)
+            tr = tmp.sample(frac=train_data_portion, random_state=10)
+            te = tmp.drop(tr.index)
+            te = te.sample(frac=test_data_portion/(1-train_data_portion) , random_state=10)
+            train.append(tr.values)
+            test.append(te.values)
+        return train, test
+            
     data = pd.read_csv(path, header=None, index_col=False)
     train = data.sample(frac=train_data_portion, random_state=10)
     test = data.drop(train.index)
