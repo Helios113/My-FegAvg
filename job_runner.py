@@ -53,14 +53,14 @@ commands = [
         "python",
         "/home/preslav/Projects/My-FegAvg/server.py",
         "--paramPath",
-        "T2/g1-1/fed/ex.yaml",
+        "T2/g2-2/fed/ex.yaml",
 
     ],
     [
         "python",
         "/home/preslav/Projects/My-FegAvg/server.py",
         "--paramPath",
-        "T2/g1-1/non/ex.yaml",
+        "T2/g2-2/non/ex.yaml",
 
     ]
 ]

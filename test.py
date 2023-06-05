@@ -10,7 +10,7 @@ cmap = matplotlib.colormaps['tab20']
 
 
 fed = True
-main_path = "T2/b"
+main_path = "T2/g2-2"
 cmp1 = "fed"
 cmp2 = "non"
 font = {'family' : 'serif',
@@ -103,9 +103,9 @@ plt.savefig(os.path.join(main_path, "f1.pdf"))
 
 print("FED:")
 
-ind = 0 if fed else int(0.4*len(y_plot))
+ind = int(0.45*len(y_plot))
 
-maxs1 = data1.iloc[:, 3::2].max(axis=0).values
+maxs1 = data1.iloc[ind:, 3::2].max(axis=0).values
 sigs1 = []
 # print(maxs)
 for i, v in enumerate(maxs1):
@@ -113,7 +113,7 @@ for i, v in enumerate(maxs1):
     sigs1.append(data1[i*2+4][max_ind].min())
 sigs1 = np.array(sigs1)
 print("NON-FED:")
-maxs2 = data2.iloc[:, 3::2].max(axis=0).values
+maxs2 = data2.iloc[ind:, 3::2].max(axis=0).values
 sigs2 = []
 
 for i, v in enumerate(maxs2):
